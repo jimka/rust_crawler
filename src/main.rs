@@ -161,7 +161,6 @@ fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
         };
     }
 
-    println!("Passages:");
     for (passage_id, passage) in passages {
              let _ = dungeon.add_passage(passage_id, passage);
     }
