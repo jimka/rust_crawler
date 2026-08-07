@@ -1,16 +1,58 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq)]
+use rand::RngExt;
+
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Size {
     pub width : usize,
     pub height: usize,
+}
+
+impl Size {
+    pub fn new(width: usize, height: usize) -> Self {
+        Self {
+            width,
+            height
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
+}
+
+impl Position {
+    pub fn new(x: usize, y: usize) -> Self {
+        Self {
+            x,
+            y
+        }
+    }
+
+    pub fn random(width: usize, height: usize) -> Position {
+        let mut rng = rand::rng();
+
+        Position::new(
+            rng.random_range(0..width),
+            rng.random_range(0..height)
+        )
+    }
+
+    pub fn step(&self, branch_direction: Direction) -> Position {
+        let mut dst = *self;
+
+        match branch_direction {
+            Direction::North => dst.y -= 1,
+            Direction::South => dst.y += 1,
+            Direction::West  => dst.x -= 1,
+            Direction::East  => dst.x += 1,
+        };
+
+        dst
+    }
 }
 
 impl Display for Position {
@@ -25,6 +67,25 @@ pub enum Direction {
     South,
     West,
     East,
+}
+impl Direction {
+    pub fn all() -> [Direction; 4] {
+        [
+            Direction::North,
+            Direction::South,
+            Direction::West,
+            Direction::East,
+        ]
+    }
+
+    pub fn opposite(&self) -> Direction {
+        match self {
+            Direction::North => Direction::South,
+            Direction::South => Direction::North,
+            Direction::West  => Direction::East,
+            Direction::East  => Direction::West,
+        }
+    }
 }
 
 impl Display for Direction {
