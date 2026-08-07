@@ -1,0 +1,6 @@
+{
+    // Use clippy instead of plain `cargo check` for inline diagnostics,
+    // so idiom suggestions show up as squiggles while editing.
+    "rust-analyzer.check.command": "clippy",
+    "rust-analyzer.checkOnSave": true,
+}
