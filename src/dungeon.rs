@@ -33,6 +33,12 @@ impl Dungeon {
         self.passages.get(id)
     }
 
+    pub fn get_passage_mut(
+        &mut self,
+        passage_id: &str,
+    ) -> Option<&mut Passage> {
+        self.passages.get_mut(passage_id)
+    }
 
     pub fn add_room(&mut self, position: Position, room: Room) -> Result<&mut Self, AddRoomError> {
         if position.x >= self.size.width || position.y >= self.size.height {
@@ -54,13 +60,6 @@ impl Dungeon {
 
     pub fn get_room_mut(&mut self, position: Position) -> Option<&mut Room> {
         self.rooms.get_mut(&position)
-    }
-
-    pub fn get_passage_mut(
-        &mut self,
-        passage_id: &str,
-    ) -> Option<&mut Passage> {
-        self.passages.get_mut(passage_id)
     }
 }
 
