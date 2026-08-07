@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn dungeon_new() {
-        let dungeon = Dungeon::new();
+        let dungeon = Dungeon::new_with_size(Size::new(16, 16));
 
         assert_eq!(dungeon.rooms.len(), 0);
         assert_eq!(dungeon.size, Size { width: 16, height: 16 });
@@ -163,7 +163,7 @@ mod tests {
     fn add_room_success() {
         let room1 = Room::new();
 
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         
         let Ok(_) = dungeon.add_room(Position { x: 0, y: 0 }, room1) else {
             panic!("Generated an error.");
@@ -177,7 +177,7 @@ mod tests {
     fn dungeon_add_room_out_of_bounds() {
         let room = Room::new();
 
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         
         let Err(e) = dungeon.add_room(Position { x: 20, y: 20 }, room) else {
             panic!("Did not generate an OutOfBounds error.");
@@ -191,7 +191,7 @@ mod tests {
         let room1 = Room::new();
         let room2 = Room::new();
 
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         
         let Ok(_) = dungeon.add_room(Position { x: 0, y: 0 }, room1) else {
             panic!("Generated an error.");
@@ -208,7 +208,7 @@ mod tests {
     fn dungeon_get_room_mut() {
         let room1 = Room::new();
 
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         
         let Ok(_) = dungeon.add_room(Position { x: 0, y: 0 }, room1) else {
             panic!("Generated an error.");
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn dungeon_get_passage_mut() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
 
         dungeon.add_passage(
             "passage".to_string(),
