@@ -1,4 +1,4 @@
-use std::collections::{HashMap,BTreeMap};
+use std::{collections::{BTreeMap, HashMap}, fmt::Display};
 
 use crate::{inventory::Inventory, util::{Direction,Position,Size}};
 
@@ -78,6 +78,15 @@ pub enum DoorState {
 pub enum Passage {
     Room { room_1: Position, room_2: Position },
     Door { state: DoorState, room_1: Position, room_2: Position },
+}
+
+impl Display for Passage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Passage::Room { room_1, room_2 } => write!(f, "{room_1} <-> {room_2}"),
+            Passage::Door { room_1, room_2, .. } => write!(f, "{room_1} <-> {room_2}"),
+        }
+    }
 }
 
 pub struct Room {

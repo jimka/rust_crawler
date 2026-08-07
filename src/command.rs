@@ -173,7 +173,7 @@ pub fn process_command(dungeon: &mut Dungeon, player: &mut Player, command: Comm
 pub fn go(dungeon: &Dungeon, player: &mut Player, direction: Direction) -> Vec<String> {
     let room = match dungeon.get_room(player.get_position()) {
         Some(r) => r,
-        None => panic!("Room doesn't exist!")
+        None => panic!("Room {} doesn't exist!", player.get_position())
     };
 
     let passage_id = match room.get_passage(direction) {
@@ -230,7 +230,7 @@ pub fn look(dungeon: &Dungeon, current_room: Position) -> Vec<String> {
 
     let room = match dungeon.get_room(current_room) {
         Some(r) => r,
-        None => panic!("Room doesn't exist!")
+        None => panic!("Room {} doesn't exist!", current_room)
     };
 
     let available_directions: Vec<String> = room.get_passages()
@@ -290,7 +290,7 @@ fn list_inventory(output: &mut Vec<String>, inventory: &crate::inventory::Invent
 
 fn take(dungeon: &mut Dungeon, player: &mut Player, item_id: &str) -> Vec<String> {
     let Some(room) = dungeon.get_room_mut(player.get_position()) else {
-        panic!("Room doesn't exist!")
+        panic!("Room {} doesn't exist!", player.get_position())
     };
 
     let from_inventory = room.get_inventory_mut();
@@ -307,7 +307,7 @@ fn take(dungeon: &mut Dungeon, player: &mut Player, item_id: &str) -> Vec<String
 
 fn put(dungeon: &mut Dungeon, player: &mut Player, item_id: &str) -> Vec<String> {
     let Some(room) = dungeon.get_room_mut(player.get_position()) else {
-        panic!("Room doesn't exist!")
+        panic!("Room {} doesn't exist!", player.get_position())
     };
 
     let from_inventory = player.get_inventory_mut();
