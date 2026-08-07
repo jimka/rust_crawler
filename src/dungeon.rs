@@ -26,6 +26,7 @@ impl Dungeon {
             passages: HashMap::new(),
         }
     }
+
     pub fn add_passage(&mut self, id: String, passage: Passage) -> &mut Self{
         self.passages.insert(id, passage);
 

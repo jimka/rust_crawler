@@ -360,10 +360,10 @@ fn map(dungeon: &Dungeon, player: &Player) -> Vec<String> {
                 };
 
                 row += match passage {
-                    Passage::Room { .. }                           => " - ",
+                    Passage::Room { ..                           } => " - ",
                     Passage::Door { state: DoorState::Locked, .. } => " & ",
                     Passage::Door { state: DoorState::Closed, .. } => " = ",
-                    Passage::Door { state: DoorState::Open, .. }   => " + ",
+                    Passage::Door { state: DoorState::Open  , .. } => " + ",
                 };
             } else {
                 row += "   ";
