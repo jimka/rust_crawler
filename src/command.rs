@@ -375,13 +375,13 @@ fn map(dungeon: &Dungeon, player: &Player) -> Vec<String> {
                 };
 
                 sub_row += match passage {
-                    Passage::Room { .. }                           => "|  ",
-                    Passage::Door { state: DoorState::Locked, .. } => "&  ",
-                    Passage::Door { state: DoorState::Closed, .. } => "=  ",
-                    Passage::Door { state: DoorState::Open, .. }   => "+  ",
+                    Passage::Room { ..                           } => "|   ",
+                    Passage::Door { state: DoorState::Locked, .. } => "&   ",
+                    Passage::Door { state: DoorState::Closed, .. } => "=   ",
+                    Passage::Door { state: DoorState::Open, ..   } => "+   ",
                 };
             } else {
-                sub_row += "   ";
+                sub_row += "    ";
             }
         }
 
@@ -390,7 +390,7 @@ fn map(dungeon: &Dungeon, player: &Player) -> Vec<String> {
             output.push(row);
         }
 
-        sub_row = sub_row.trim().to_string();
+        sub_row = sub_row.trim_end().to_string();
         if !sub_row.is_empty() {
             output.push(sub_row);
         }
