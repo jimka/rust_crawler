@@ -94,13 +94,27 @@ fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
 
         let passage_id: String = format!("passage_{}", passages.len() + 1);
 
-        passages.insert(
-            passage_id.clone(),
-            Passage::Room {
-                room_1: branch_from_room_position,
-                room_2: branch_to_room_position
+        match rng.random_range(0..100) {
+            0..25 => {
+                passages.insert(
+                    passage_id.clone(),
+                    Passage::Door {
+                        state: dungeon::DoorState::Closed,
+                        room_1: branch_from_room_position,
+                        room_2: branch_to_room_position
+                    }
+                );
+            },
+            _ => {
+                passages.insert(
+                    passage_id.clone(),
+                    Passage::Room {
+                        room_1: branch_from_room_position,
+                        room_2: branch_to_room_position
+                    }
+                );
             }
-        );
+        }
 
         src_room.add_passage(branch_direction, passage_id.clone());
 
@@ -138,12 +152,13 @@ fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
     }
 
     for (_, passage) in passages.iter_mut() {
-        let Passage::Room { room_1, room_2 } = passage else {
-            todo!()
+        if let Passage::Room { room_1, room_2 } = passage {
+            room_1.x -= min_x;
+            room_2.x -= min_x;
+        } else if let Passage::Door { room_1, room_2, .. } = passage {
+            room_1.x -= min_x;
+            room_2.x -= min_x;
         };
-
-        room_1.x -= min_x;
-        room_2.x -= min_x;
     }
 
     println!("Passages:");
