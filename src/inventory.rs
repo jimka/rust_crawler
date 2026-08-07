@@ -25,14 +25,6 @@ impl Inventory {
         &self.items
     }
 
-    pub fn add<I>(&mut self, item: I) 
-        where I: Item + 'static
-    {
-        let boxed = Box::new(item);
-
-        self.items.push(boxed);
-    }
-    
     pub fn take_item(&mut self, item_id: &str) -> Option<Box<dyn Item>> {
         let opt = self.items
             .iter()
@@ -76,17 +68,6 @@ pub struct Key {
 
 impl Key {
 
-    pub fn new(door: String) -> Self {
-        Key::new_with_description(
-            String::from("a normal key"),
-            door,
-        )
-    }
-
-    pub fn new_with_description(description: String, door: String) -> Self {
-        Key { id: String::from("key"), description, door }
-    }
-    
     pub fn get_door(&self) -> &str {
         &self.door
     }

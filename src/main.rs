@@ -15,7 +15,7 @@ use util::{Direction,Position};
 use command::{Command,look,CommandResult,process_command};
 use player::Player;
 
-use crate::{dungeon::DoorState, inventory::Key, util::Size};
+use crate::util::Size;
 
 fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
     if room_count > size.width * size.height {
