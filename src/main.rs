@@ -6,94 +6,154 @@ mod player;
 mod inventory;
 // ---- Module registry ----
 
-use std::io::{BufRead, BufReader, Write};
+use std::{collections::HashMap, io::{BufRead, BufReader, Write}, unreachable};
+
 
 use dungeon::{Dungeon,Passage,Room};
+use rand::RngExt;
 use util::{Direction,Position};
 use command::{Command,look,CommandResult,process_command};
 use player::Player;
 
-use crate::{dungeon::DoorState, inventory::Key};
+use crate::{dungeon::DoorState, inventory::Key, util::Size};
 
-fn build_dungeon() -> Dungeon {
-    let mut dungeon = Dungeon::new();
+fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
+    if room_count > size.width * size.height {
+        panic!("Can't fit that many rooms in a dungeon of that size.")
+    }
 
-    dungeon.add_passage("r1r2".to_string(), Passage::Room {
-        room_1: Position { x: 0, y: 0 },
-        room_2: Position { x: 0, y: 1 },
-    }).add_passage(
-        "r2r3".to_string(),
-        Passage::Door {
-            room_1: Position { x: 0, y: 1 },
-            room_2: Position { x: 1, y: 1 },
-            state: DoorState::Locked
+    let mut rng = rand::rng();
+
+    let mut room_count = room_count - 1;
+    let mut map = HashMap::new();
+    let mut passages = HashMap::new();
+    let mut start_position = Position::random(size.width,size.height);
+
+    let start_room = Room::new();
+
+    map.insert(start_position, start_room);
+
+    while room_count != 0 {
+        let positions: Vec<Position> = map
+            .keys()
+            .copied()
+            .collect();
+
+        let branch_from_room = rng.random_range(0..positions.len());
+        let branch_from_room_position = *positions.get(branch_from_room).unwrap();
+
+        let src_room = map.get_mut(&branch_from_room_position).unwrap();
+
+        let branches = src_room.get_passages();
+        let current_branch_count = branches.len();
+
+        if current_branch_count == 4 {
+            // Unable to branch more from this room.
+            continue;
         }
-    ).add_passage(
-        "r3r4".to_string(),
-        Passage::Door {
-            room_1: Position { x: 1, y: 1 },
-            room_2: Position { x: 2, y: 1 },
-            state: DoorState::Closed
+
+        let chance_of_new_branch: usize = match current_branch_count {
+            0 => 100,
+            1 => 20,
+            2 => 10,
+            3 => 5,
+            _ => unreachable!("Shouldn't be possible")
+        };
+
+        let should_add_branch = rng.random_range(0..100) < chance_of_new_branch;
+        if !should_add_branch {
+            continue;
         }
-    ).add_passage(
-        "r2r5".to_string(),
-        Passage::Door {
-            room_1: Position { x: 0, y: 1 },
-            room_2: Position { x: 0, y: 2 },
-            state: DoorState::Locked
+
+        let available_branches: Vec<Direction> = Direction::all()
+            .iter()
+            .filter(|&x| !branches.contains_key(x))
+            .filter(|&x| {
+                match *x {
+                    Direction::North => branch_from_room_position.y != 0,
+                    Direction::South => branch_from_room_position.y != size.height - 1,
+                    Direction::West  => branch_from_room_position.x != 0,
+                    Direction::East  => branch_from_room_position.x != size.width - 1,
+                }
+            })
+            .copied()
+            .collect();
+
+        if available_branches.is_empty() {
+            continue;
         }
-    );
 
-    let mut r1 = Room::new();
-    r1.add_passage(
-        Direction::South,
-        "r1r2".to_string()
-    );
+        let branch_direction_idx = rng.random_range(0..available_branches.iter().len());
+        let branch_direction = *available_branches.get(branch_direction_idx).unwrap();
+        let return_direction = branch_direction.opposite();
+        let branch_to_room_position = branch_from_room_position.step(branch_direction);
 
-    r1.get_inventory_mut().add(
-        Key::new("r2r3".to_string())
-    );
+        if branch_from_room_position == branch_to_room_position {
+            continue;
+        }
 
-    let mut r2 = Room::new();
-    r2.add_passage(
-        Direction::North,
-        "r1r2".to_string(),
-    ).add_passage(
-        Direction::East,
-        "r2r3".to_string(),
-    ).add_passage(
-        Direction::South,
-        "r2r5".to_string(),
-    );
+        let passage_id: String = format!("passage_{}", passages.len() + 1);
 
-    let mut r3 = Room::new();
-    r3.add_passage(
-        Direction::West,
-        "r2r3".to_string(),
-    ).add_passage(
-        Direction::East,
-        "r3r4".to_string(),
-    );
+        passages.insert(
+            passage_id.clone(),
+            Passage::Room {
+                room_1: branch_from_room_position,
+                room_2: branch_to_room_position
+            }
+        );
 
-    let mut r4 = Room::new();
-    r4.add_passage(
-        Direction::West,
-        "r3r4".to_string(),
-    );
+        src_room.add_passage(branch_direction, passage_id.clone());
 
-    let mut r5 = Room::new();
-    r5.add_passage(
-        Direction::North,
-        "r2r5".to_string(),
-    );
+        let mut preexisting_room = false;
 
-    dungeon.add_room(Position { x: 0, y: 0 }, r1).unwrap()
-           .add_room(Position { x: 0, y: 1 }, r2).unwrap()
-           .add_room(Position { x: 1, y: 1 }, r3).unwrap()
-           .add_room(Position { x: 2, y: 1 }, r4).unwrap()
-           .add_room(Position { x: 0, y: 2 }, r5).unwrap();
+        let dst_room = if let Some(room) = map.get_mut(&branch_to_room_position) {
+            preexisting_room = true;
 
-    dungeon
+            room
+        } else {
+            map.insert(branch_to_room_position, Room::new());
+
+            let Some(room) = map.get_mut(&branch_to_room_position) else {
+                unreachable!("Oh my, why?!")
+            };
+
+            room
+        };
+
+        dst_room.add_passage(return_direction, passage_id.clone());
+
+        if !preexisting_room {
+            room_count -= 1;
+        }
+    }
+
+    let min_x = map.keys().map(|x| x.x).reduce(|acc, x| if acc < x { acc } else { x }).unwrap();
+
+    let mut dungeon = Dungeon::new_with_size(size);
+
+    for (position, room) in map {
+        let shifted_position = Position::new(position.x - min_x, position.y);
+
+        let _ = dungeon.add_room(shifted_position, room);
+    }
+
+    for (_, passage) in passages.iter_mut() {
+        let Passage::Room { room_1, room_2 } = passage else {
+            todo!()
+        };
+
+        room_1.x -= min_x;
+        room_2.x -= min_x;
+    }
+
+    println!("Passages:");
+    for (passage_id, passage) in passages {
+             let _ = dungeon.add_passage(passage_id, passage);
+    }
+
+    start_position.x -= min_x;
+
+    (dungeon, start_position)
 }
 
 fn main() {
@@ -101,8 +161,8 @@ fn main() {
 }
 
 fn game_loop() {
-    let mut dungeon = build_dungeon();
-    let mut player = Player::new(Position { x: 0, y: 0 });
+    let (mut dungeon, start_position) = generate_dungeon(Size::new(16, 16), 16);
+    let mut player = Player::new(start_position);
 
     println!("You enter the dungeon!");
     println!();
