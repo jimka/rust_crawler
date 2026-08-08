@@ -15,6 +15,7 @@ pub enum AddRoomError {
 }
 
 impl Dungeon {
+
     pub fn new_with_size(size: Size) -> Dungeon {
         Dungeon {
             size,

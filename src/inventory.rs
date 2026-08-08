@@ -37,8 +37,15 @@ impl Inventory {
 
         Some(item)
     }
-    
-    pub fn put_item(&mut self, item: Box<dyn Item>) {
+
+    pub fn put_item<I>(&mut self, item: I)
+    where I: Item + 'static {
+        let boxed = Box::from(item);
+
+        self.items.push(boxed);
+    }
+
+    pub fn put_boxed_item(&mut self, item: Box<dyn Item>) {
         self.items.push(item);
     }
 }
@@ -67,6 +74,14 @@ pub struct Key {
 }
 
 impl Key {
+
+    pub fn new(door: &str) -> Self{
+        Key {
+            id: "key".to_string(),
+            description: "a normal key".to_string(),
+            door: door.to_string()
+        }
+    }
 
     pub fn get_door(&self) -> &str {
         &self.door

@@ -300,7 +300,7 @@ fn take(dungeon: &mut Dungeon, player: &mut Player, item_id: &str) -> Vec<String
         return vec!("No such item exists!".to_string());
     };
 
-    to_inventory.put_item(item);
+    to_inventory.put_boxed_item(item);
 
     vec![format!("You take {item_id} and place it into your inventory.")]
 }
@@ -317,7 +317,7 @@ fn put(dungeon: &mut Dungeon, player: &mut Player, item_id: &str) -> Vec<String>
         return vec!("No such item exists!".to_string());
     };
 
-    to_inventory.put_item(item);
+    to_inventory.put_boxed_item(item);
 
     vec![format!("You take {item_id} from your inventory and put it in the room.")]
 }
