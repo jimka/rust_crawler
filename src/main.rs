@@ -5,6 +5,7 @@ mod command;
 mod player;
 mod inventory;
 mod dungeon_generator;
+mod glyph;
 // ---- Module registry ----
 
 use std::io::{BufRead, BufReader, Write};
@@ -27,7 +28,7 @@ fn game_loop() {
     println!("You enter the dungeon!");
     println!();
 
-    look(&dungeon, player.get_position())
+    look(&dungeon, player.get_position(), None)
         .iter()
         .for_each(|x| println!("{x}"));
 

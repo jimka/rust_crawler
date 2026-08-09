@@ -8,7 +8,7 @@ use crate::util::{Direction,Position};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Command {
     Go { direction: Direction },
-    Look,
+    Look { target: Option<String> },
     Open { direction: Direction },
     Close { direction: Direction },
     Take { id: String },
@@ -44,7 +44,16 @@ impl FromStr for Command {
                     Err(TakeDirectionError::Invalid) => Ok(Command::Incomplete { reason: INVALID_DIRECTION }),
                 }
             },
-            "look" => Ok(Command::Look),
+            "look" => {
+                let arg = tokens
+                                      .fold(String::new(), |acc, x| acc + " " + x)
+                                      .trim()
+                                      .to_string();
+
+                let target = if !arg.is_empty() { Some(arg) } else { None };
+
+                Ok(Command::Look { target })
+            },
             "open" => {
                 match take_direction(&mut tokens) {
                     Ok(d) => Ok(Command::Open { direction: d }),
@@ -60,25 +69,41 @@ impl FromStr for Command {
                 }
             },
             "take" => {
-                match tokens.next() {
-                    Some(id) => Ok(Command::Take { id: id.to_string() }),
-                    None => Ok(Command::Incomplete { reason: "Take what?!" }),
+                let arg = tokens
+                                      .fold(String::new(), |acc, x| acc + " " + x)
+                                      .trim()
+                                      .to_string();
+
+                if !arg.is_empty() {
+                    Ok(Command::Take { id: arg })
+                } else {
+                    Ok(Command::Incomplete { reason: "Take what?!" })
                 }
-                
             },
             "put" => {
-                match tokens.next() {
-                    Some(id) => Ok(Command::Put { id: id.to_string() }),
-                    None => Ok(Command::Incomplete { reason: "Put what?!" }),
+                let arg = tokens
+                                      .fold(String::new(), |acc, x| acc + " " + x)
+                                      .trim()
+                                      .to_string();
+
+                if !arg.is_empty() {
+                    Ok(Command::Put { id: arg })
+                } else {
+                    Ok(Command::Incomplete { reason: "Put what?!" })
                 }
-                
             },
             "map" => Ok(Command::Map),
             "inventory" => Ok(Command::Inventory),
             "use" => {
-                match tokens.next() {
-                    Some(id) => Ok(Command::Use { item_id: id.to_string() }),
-                    None => Ok(Command::Incomplete { reason: "Use what?!" }),
+                let arg = tokens
+                                      .fold(String::new(), |acc, x| acc + " " + x)
+                                      .trim()
+                                      .to_string();
+
+                if !arg.is_empty() {
+                    Ok(Command::Use { item_id: arg })
+                } else {
+                    Ok(Command::Incomplete { reason: "Use what?!" })
                 }
             },
             "exit" => Ok(Command::Exit),
@@ -153,7 +178,7 @@ pub fn flip_door(
 pub fn process_command(dungeon: &mut Dungeon, player: &mut Player, command: Command) -> CommandResult {
     let (running, output) = match command {
         Command::Go { direction } => ( true, go(dungeon, player, direction) ),
-        Command::Look => ( true, look(dungeon, player.get_position()) ),
+        Command::Look { target } => ( true, look(dungeon, player.get_position(), target) ),
         Command::Open { direction } => ( true, flip_door(dungeon, player.get_position(), direction, DoorState::Open) ),
         Command::Close { direction } => ( true, flip_door(dungeon, player.get_position(), direction, DoorState::Closed) ),
         Command::Take { id } => ( true, take(dungeon, player, &id) ),
@@ -198,6 +223,7 @@ pub fn go(dungeon: &Dungeon, player: &mut Player, direction: Direction) -> Vec<S
             state,
             room_1,
             room_2,
+            ..
         } => {
             match state {
                 DoorState::Closed => return vec!["The door is closed.".to_string()],
@@ -220,18 +246,42 @@ pub fn go(dungeon: &Dungeon, player: &mut Player, direction: Direction) -> Vec<S
         output.push(String::from(""));
     }
 
-    output.extend(look(dungeon, player.get_position()));
+    output.extend(look(dungeon, player.get_position(), None));
 
     output
 }
 
-pub fn look(dungeon: &Dungeon, current_room: Position) -> Vec<String> {
-    let mut output: Vec<String> = vec![];
-
+pub fn look(dungeon: &Dungeon, current_room: Position, target: Option<String>) -> Vec<String> {
     let room = match dungeon.get_room(current_room) {
         Some(r) => r,
         None => panic!("Room {} doesn't exist!", current_room)
     };
+
+    match target {
+        Some(object) => look_object(dungeon, room, object),
+        None => look_room(dungeon, room)
+    }
+}
+
+fn look_object(dungeon: &Dungeon, room: &crate::dungeon::Room, object: String) -> Vec<String> {
+    let mut tokens = object.split_whitespace();
+    if let Ok(direction) = take_direction(&mut tokens) {
+        let Some(passage_id) = room.get_passage(direction) else {
+            return vec!["I can't see a {direction} passage.".to_string()];
+        };
+
+        let Some(passage) = dungeon.get_passage(passage_id) else {
+            panic!("Unable to find passage {passage_id}.")
+        };
+
+        vec![passage.get_description()]
+    } else {
+        vec!["I can't see that!".to_string()]
+    }
+}
+
+fn look_room(dungeon: &Dungeon, room: &crate::dungeon::Room) -> Vec<String> {
+    let mut output: Vec<String> = vec![];
 
     let available_directions: Vec<String> = room.get_passages()
         .iter()
@@ -411,9 +461,13 @@ fn use_item(dungeon: &mut Dungeon, player: &Player, item_id: String) -> Vec<Stri
 
 fn use_key(dungeon: &mut Dungeon, player: &Player, key: &Key) -> Vec<String> {
     let door = key.get_door();
-    let Some(Passage::Door { state, room_1, room_2 }) = dungeon.get_passage_mut(door) else {
+    let Some(Passage::Door { state, glyph, room_1, room_2 }) = dungeon.get_passage_mut(door) else {
         panic!("Couldn't find door!")
     };
+
+    if key.get_glyph() != *glyph {
+        panic!("Inconsistant dungeon state. Glyph on key doesn't match glyph on door.")
+    }
 
     if *room_1 != player.get_position() && *room_2 != player.get_position(){
         return vec!["The key doesn't fit any door in this room!".to_string()];
@@ -442,7 +496,7 @@ mod tests {
 
     use std::{ assert_eq, collections::{HashMap} };
 
-    use crate::dungeon::{Dungeon,Passage,Room};
+    use crate::{dungeon::{Dungeon,Passage,Room}, glyph::Glyph, util::Size};
     use crate::util::{Direction,Position};
 
     #[test]
@@ -450,7 +504,7 @@ mod tests {
         let map = HashMap::from([
             ( "go north"       , Command::Go { direction: Direction::North } ),
             ( "go"             , Command::Incomplete { reason: "Go where?!" } ),
-            ( "look"           , Command::Look ),
+            ( "look"           , Command::Look { target: None }),
             ( "open east"      , Command::Open { direction: Direction::East } ),
             ( "open up"        , Command::Incomplete { reason: "That's not a valid direction!" } ),
             ( "open"           , Command::Incomplete { reason: "Open what?!" } ),
@@ -542,10 +596,11 @@ mod tests {
         dungeon: &mut Dungeon,
         passage_id: String,
         state: DoorState,
+        glyph: Glyph,
         room_1: Position,
         room_2: Position
     ) {
-        dungeon.add_passage(passage_id.clone(), Passage::Door { state, room_1, room_2 });
+        dungeon.add_passage(passage_id.clone(), Passage::Door { state, glyph, room_1, room_2 });
         
         connect_passage(dungeon, passage_id, room_1, room_2);
     }
@@ -553,7 +608,7 @@ mod tests {
     #[test]
     #[should_panic(expected="Player is in an unknown room!")]
     fn flip_door_missing_room() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let current_room = Position { x: 10, y: 10 };
         let direction = Direction::North;
         let should_be_closed = DoorState::Open;
@@ -568,7 +623,7 @@ mod tests {
 
     #[test]
     fn flip_door_missing_door() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let _ = dungeon.add_room(
             Position {
                 x: 10,
@@ -597,10 +652,11 @@ mod tests {
 
     #[test]
     fn flip_door_already_open() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_door(&mut dungeon, 
             "passage".to_string(),
             DoorState::Open,
+            Glyph::random(),
             Position {
                 x: 10,
                 y: 10
@@ -631,10 +687,11 @@ mod tests {
     #[test]
     fn flip_door_success() {
         let passage_id = "passage".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_door(&mut dungeon, 
             passage_id.clone(),
             DoorState::Closed,
+            Glyph::random(),
             Position {
                 x: 10,
                 y: 10
@@ -670,13 +727,14 @@ mod tests {
     #[test]
     #[should_panic(expected="Player is in an unknown room!")]
     fn flip_door_destination_doesnt_exist() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let mut room = Room::new();
 
         dungeon.add_passage(
             "passage".to_string(),
             Passage::Door {
                 state: DoorState::Open,
+                glyph: Glyph::random(),
                 room_1: Position {
                     x: 10,
                     y: 10
@@ -703,9 +761,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected="Room doesn't exist!")]
+    #[should_panic(expected="Room 10x10 doesn't exist!")]
     fn go_unknown_room() {
-        let dungeon = Dungeon::new();
+        let dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let mut player = Player::new(
             Position { x: 10, y: 10 }
         );
@@ -716,7 +774,7 @@ mod tests {
 
     #[test]
     fn go_no_passage() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let _ = dungeon.add_room(
             Position {
                 x: 10,
@@ -739,10 +797,11 @@ mod tests {
     #[test]
     fn go_through_closed_door() {
         let passage_id = "passage".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_door(&mut dungeon, 
             passage_id.clone(),
             DoorState::Closed,
+            Glyph::random(),
             Position {
                 x: 10,
                 y: 10
@@ -768,10 +827,11 @@ mod tests {
    #[test]
     fn go_through_opened_door() {
         let passage_id = "passage".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_door(&mut dungeon,
             passage_id.clone(),
             DoorState::Open,
+            Glyph::random(),
             Position {
                 x: 10,
                 y: 10
@@ -797,12 +857,12 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Room doesn't exist")]
+    #[should_panic(expected = "Room 10x9 doesn't exist")]
     fn go_through_passage_to_missing_room() {
         let passage_id = "passage".to_string();
         let room_1 = Position { x: 10, y: 10 };
         let room_2 = Position { x: 10, y: 9 };
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
 
         dungeon.add_passage(passage_id.clone(), Passage::Room { room_1, room_2 });
 
@@ -821,7 +881,7 @@ mod tests {
     #[test]
     fn go_through_passage() {
         let passage_id = "passage".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_room(&mut dungeon,
             passage_id.clone(),
             Position {
@@ -850,17 +910,17 @@ mod tests {
 
 
     #[test]
-    #[should_panic(expected = "Room doesn't exist")]
+    #[should_panic(expected = "Room 10x10 doesn't exist")]
     fn look_unknown_room() {
-        let dungeon = Dungeon::new();
+        let dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let current_room = Position { x: 10, y: 10 };
 
-        super::look(&dungeon, current_room);
+        super::look(&dungeon, current_room, None);
     }
 
     #[test]
     fn look_no_passages() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let _ = dungeon.add_room(
             Position {
                 x: 10,
@@ -872,7 +932,7 @@ mod tests {
         let expected: Vec<String> = vec![
         ];
 
-        let result = super::look(&dungeon, current_room);
+        let result = super::look(&dungeon, current_room, None);
 
         assert_eq!(expected, result);
     }
@@ -880,7 +940,7 @@ mod tests {
     #[test]
     fn look_one_passage() {
         let passage_id = "passage".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_room(&mut dungeon,
             passage_id.clone(),
             Position {
@@ -897,7 +957,7 @@ mod tests {
             "There is one passage leading north.".to_string()
         ];
 
-        let result = super::look(&dungeon, current_room);
+        let result = super::look(&dungeon, current_room, None);
 
         assert_eq!(expected, result);
     }
@@ -906,7 +966,7 @@ mod tests {
     fn look_two_passages() {
         let passage_id_1 = "passage_1".to_string();
         let passage_id_2 = "passage_2".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_room(
             &mut dungeon,
             passage_id_1.clone(),
@@ -936,7 +996,7 @@ mod tests {
             "You see passages to the north and south.".to_string()
         ];
 
-        let result = super::look(&dungeon, current_room);
+        let result = super::look(&dungeon, current_room, None);
 
         assert_eq!(expected, result);
     }
@@ -946,7 +1006,7 @@ mod tests {
         let passage_id_1 = "passage_1".to_string();
         let passage_id_2 = "passage_2".to_string();
         let passage_id_3 = "passage_3".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_room(
             &mut dungeon,
             passage_id_1.clone(),
@@ -988,7 +1048,7 @@ mod tests {
             "You see passages to the north, south, and west.".to_string()
         ];
 
-        let result = super::look(&dungeon, current_room);
+        let result = super::look(&dungeon, current_room, None);
 
         assert_eq!(expected, result);
     }
@@ -996,11 +1056,12 @@ mod tests {
     #[test]
     fn look_one_door() {
         let passage_id_1 = "passage_1".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_door(
             &mut dungeon,
             passage_id_1.clone(),
             DoorState::Closed,
+            Glyph::random(),
             Position {
                 x: 10,
                 y: 10
@@ -1015,7 +1076,7 @@ mod tests {
             "To the north there is a door.".to_string()
         ];
 
-        let result = super::look(&dungeon, current_room);
+        let result = super::look(&dungeon, current_room, None);
 
         assert_eq!(expected, result);
     }
@@ -1024,11 +1085,12 @@ mod tests {
     fn look_two_doors() {
         let passage_id_1 = "passage_1".to_string();
         let passage_id_2 = "passage_2".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_door(
             &mut dungeon,
             passage_id_1.clone(),
             DoorState::Closed,
+            Glyph::random(),
             Position {
                 x: 10,
                 y: 10
@@ -1042,6 +1104,7 @@ mod tests {
             &mut dungeon,
             passage_id_2.clone(),
             DoorState::Closed,
+            Glyph::random(),
             Position {
                 x: 10,
                 y: 10
@@ -1055,14 +1118,14 @@ mod tests {
             "You see doors to the north, and south.".to_string()
         ];
 
-        let result = super::look(&dungeon, current_room);
+        let result = super::look(&dungeon, current_room, None);
 
         assert_eq!(expected, result);
     }
 
     #[test]
     fn process_command_exits() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let mut player = Player::new(
             Position { x: 10, y: 0 }
         );
@@ -1077,7 +1140,7 @@ mod tests {
     #[test]
     fn process_command_go_north() {
         let passage_id_1 = "passage_1".to_string();
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         connect_room(
             &mut dungeon,
             passage_id_1.clone(),
@@ -1107,7 +1170,7 @@ mod tests {
 
     #[test]
     fn process_command_blank() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let mut player = Player::new(
             Position { x: 10, y: 10 }
         );
@@ -1123,7 +1186,7 @@ mod tests {
 
     #[test]
     fn process_command_unknown() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let mut player = Player::new(
             Position { x: 10, y: 10 }
         );
@@ -1138,7 +1201,7 @@ mod tests {
 
     #[test]
     fn process_command_incomplete() {
-        let mut dungeon = Dungeon::new();
+        let mut dungeon = Dungeon::new_with_size(Size::new(16, 16));
         let mut player = Player::new(
             Position { x: 10, y: 10 }
         );

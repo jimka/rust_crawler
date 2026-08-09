@@ -9,9 +9,7 @@ use crate::{
         Dungeon,
         Passage,
         Room
-    },
-    inventory::Key,
-    util::{
+    }, glyph::Glyph, inventory::Key, util::{
         Direction,
         Position,
         Size
@@ -32,6 +30,7 @@ pub fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
     let mut start_position = Position::random(size.width,size.height);
 
     let start_room = Room::new();
+    let mut used_glyphs = vec![];
 
     map.insert(start_position, start_room);
 
@@ -99,10 +98,19 @@ pub fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
         match rng.random_range(0..100) {
             0..30 => {
                 let should_be_locked = rng.random_range(0..100) < 50;
+                let mut glyph = Glyph::random();
+
+                while used_glyphs.contains(&glyph) {
+                    glyph = Glyph::random();
+                }
+
+                used_glyphs.push(glyph);
+
                 passages.insert(
                     passage_id.clone(),
                     Passage::Door {
                         state: if should_be_locked { dungeon::DoorState::Locked } else { dungeon::DoorState::Closed },
+                        glyph,
                         room_1: branch_from_room_position,
                         room_2: branch_to_room_position
                     }
@@ -210,8 +218,9 @@ fn place_keys(
 
         let Passage::Door {
             state: DoorState::Locked,
+            glyph,
             room_1,
-            room_2
+            room_2,
         } = passage else {
             unreachable!("Should only be locked doors here!");
         };
@@ -229,7 +238,7 @@ fn place_keys(
             let room = rooms.get_mut(room_position).expect("Where's my room?!");
 
             let room_inventory = room.get_inventory_mut();
-            room_inventory.put_item(Key::new(&door_id));
+            room_inventory.put_item(Key::new(*glyph, &door_id));
         } else {
             let destination_idx = partitions_with_doors
                 .iter()
@@ -246,7 +255,7 @@ fn place_keys(
             let room = rooms.get_mut(room_position).expect("Where's my room?!");
 
             let room_inventory = room.get_inventory_mut();
-            room_inventory.put_item(Key::new(&door_id));
+            room_inventory.put_item(Key::new(*glyph, &door_id));
 
             destination_door_ids.retain(|x| *x != door_id);
 
@@ -273,7 +282,7 @@ fn fetch_doors(partition: &[Position], passages: &HashMap<String, Passage>) -> V
 
     for (passage_id, passage) in passages {
         let (room_1, room_2) = match passage {
-            Passage::Door { state: DoorState::Locked, room_1, room_2 } => (room_1, room_2),
+            Passage::Door { state: DoorState::Locked, room_1, room_2, .. } => (room_1, room_2),
             _ => continue,
         };
 

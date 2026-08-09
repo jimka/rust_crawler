@@ -1,6 +1,6 @@
 use std::{collections::{BTreeMap, HashMap}, fmt::Display};
 
-use crate::{inventory::Inventory, util::{Direction,Position,Size}};
+use crate::{glyph::Glyph, inventory::Inventory, util::{Direction,Position,Size}};
 
 pub struct Dungeon {
     pub size: Size,
@@ -74,7 +74,47 @@ pub enum DoorState {
 #[derive(Debug, Copy, Clone)]
 pub enum Passage {
     Room { room_1: Position, room_2: Position },
-    Door { state: DoorState, room_1: Position, room_2: Position },
+    Door { state: DoorState, glyph: Glyph, room_1: Position, room_2: Position },
+}
+
+impl Passage {
+
+    pub fn get_description(&self) -> String {
+        match &self {
+            Passage::Room { .. } => describe_passage(self),
+            Passage::Door { .. } => describe_door(self),
+        }
+    }
+}
+
+fn describe_passage(arg: &Passage) -> String{
+    let Passage::Room { .. } = arg else {
+        panic!("Should only be rooms here!")
+    };
+
+    "You see a dark passage.".to_string()
+}
+
+fn describe_door(arg: &Passage)  -> String {
+    let Passage::Door { state, glyph, .. } = arg else {
+        panic!("Should only be doors here!")
+    };
+
+    let state_string = match state {
+        DoorState::Open => "an opened",
+        DoorState::Closed => "a closed",
+        DoorState::Locked => "a locked",
+    };
+
+        let glyph_string = glyph.to_string().to_lowercase();
+
+        let is_an = glyph_string.starts_with(['a', 'e', 'i', 'o', 'u'])
+                              && ![Glyph::Unicorn, Glyph::Ouroboros].contains(glyph);
+
+    format!("You see {state_string} door marked with {} {} glyph.",
+        if is_an { "an" } else { "a" },
+        glyph_string
+    )
 }
 
 impl Display for Passage {
@@ -226,6 +266,7 @@ mod tests {
             "passage".to_string(),
             Passage::Door {
                 state: DoorState::Open,
+                glyph: Glyph::Alerion,
                 room_1: Position { x: 0, y: 0 },
                 room_2: Position { x: 1, y: 1 },
             }
@@ -235,6 +276,7 @@ mod tests {
             dungeon.get_passage_mut("passage"),
             Some(Passage::Door {
                 state: DoorState::Open,
+                glyph: Glyph::Alerion,
                 room_1: Position { x: 0, y: 0 },
                 room_2: Position { x: 1, y: 1 },
             })

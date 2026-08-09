@@ -1,3 +1,5 @@
+use crate::glyph::Glyph;
+
 pub struct Inventory {
     items: Vec<Box<dyn Item>>
 }
@@ -71,20 +73,31 @@ pub struct Key {
     id         : String,
     description: String,
     door       : String,
+    glyph      : Glyph
 }
 
 impl Key {
 
-    pub fn new(door: &str) -> Self{
+    pub fn new(glyph: Glyph, door: &str) -> Self{
+        let glyph_string = glyph.to_string().to_lowercase();
+
+        let is_an = glyph_string.starts_with(['a', 'e', 'i', 'o', 'u'])
+                              && ![Glyph::Unicorn, Glyph::Ouroboros].contains(&glyph);
+
         Key {
-            id: "key".to_string(),
-            description: "a normal key".to_string(),
-            door: door.to_string()
+            id         : glyph_string.clone() + " key",
+            description: format!("A key marked with {} {} glyph.", if is_an { "an" } else { "a" }, glyph_string),
+            door       : door.to_string(),
+            glyph
         }
     }
 
     pub fn get_door(&self) -> &str {
         &self.door
+    }
+
+    pub fn get_glyph(&self) -> Glyph {
+        self.glyph
     }
 }
 
@@ -99,14 +112,12 @@ impl Item for Key {
     }
 
     fn matches(&self, id: &str) -> bool {
-        self.id == id
+        self.id.to_lowercase() == id.to_lowercase()
     }
     
     fn as_key(&self) -> Option<&Key> {
         Some(self)
     }
-
-    
 }
 
 #[cfg(test)]
@@ -121,26 +132,27 @@ use super::*;
             items: vec![]
         };
 
-        let k = Key::new("666".to_string());
+        let k = Key::new(Glyph::random(), "666");
 
-        inventory.add(k);
+        inventory.put_item(k);
 
         assert_eq!(inventory.items.len(), 1);
     }
 
     #[test]
     fn key_new() {
-        let k = Key::new("666".to_string());
+        let glyph = Glyph::Argent;
+        let k = Key::new(glyph, "666");
 
-        assert!(k.matches("key"));
-        assert_eq!(k.get_description(), "a normal key");
+        assert!(k.matches("Argent key"));
+        assert_eq!(k.get_description(), "A key marked with an argent glyph.");
         assert_eq!(k.get_door(), "666");
     }
 
     #[test]
     fn key_get_type() {
         let expected = ItemType::Key;
-        let k = Key::new("666".to_string());
+        let k = Key::new(Glyph::random(), "666");
 
         let result = k.get_type();
 
