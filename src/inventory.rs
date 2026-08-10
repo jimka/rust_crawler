@@ -68,6 +68,7 @@ pub trait Item {
     fn as_key(&self) -> Option<&Key>;
 }
 
+#[derive(Debug, Clone)]
 pub struct Key {
 
     id         : String,

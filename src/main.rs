@@ -12,10 +12,11 @@ use std::io::{BufRead, BufReader, Write};
 
 use command::{Command,look,CommandResult,process_command};
 use player::Player;
-use dungeon_generator::generate_dungeon;
 
 use dungeon::Dungeon;
 use util::Size;
+
+use crate::dungeon_generator::generate_dungeon;
 
 fn main() {
     game_loop();

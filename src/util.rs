@@ -1,8 +1,6 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use rand::RngExt;
-
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Size {
     pub width : usize,
@@ -30,15 +28,6 @@ impl Position {
             x,
             y
         }
-    }
-
-    pub fn random(width: usize, height: usize) -> Position {
-        let mut rng = rand::rng();
-
-        Position::new(
-            rng.random_range(0..width),
-            rng.random_range(0..height)
-        )
     }
 
     pub fn step(&self, branch_direction: Direction) -> Position {

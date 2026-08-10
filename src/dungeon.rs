@@ -55,6 +55,11 @@ impl Dungeon {
         Ok(self)
     }
 
+    #[cfg(test)]
+    pub fn get_room_count(&self) -> usize {
+        self.rooms.len()
+    }
+
     pub fn get_room(&self, position: Position) -> Option<&Room> {
         self.rooms.get(&position)
     }
@@ -71,7 +76,7 @@ pub enum DoorState {
     Locked
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Passage {
     Room { room_1: Position, room_2: Position },
     Door { state: DoorState, glyph: Glyph, room_1: Position, room_2: Position },

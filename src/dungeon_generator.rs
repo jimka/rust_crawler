@@ -1,6 +1,6 @@
-use std::{collections::{HashMap, HashSet}, unreachable};
+use std::{collections::{HashMap, HashSet}};
 
-use rand::RngExt;
+use rand::{Rng, RngExt};
 
 use crate::{
     dungeon::{
@@ -18,16 +18,24 @@ use crate::{
 
 
 pub fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
+    let mut rng = rand::rng();
+
+    generate_dungeon_with_rng(&mut rng, size, room_count)
+}
+
+pub fn generate_dungeon_with_rng<T>(rng: &mut T, size: Size, room_count: usize) -> (Dungeon, Position) 
+    where T: Rng {
     if room_count > size.width * size.height {
         panic!("Can't fit that many rooms in a dungeon of that size.")
     }
 
-    let mut rng = rand::rng();
-
     let mut room_count = room_count - 1;
     let mut map = HashMap::new();
     let mut passages = HashMap::new();
-    let mut start_position = Position::random(size.width,size.height);
+    let mut start_position = Position::new(
+        rng.random_range(0..size.width),
+        rng.random_range(0..size.height)
+    );
 
     let start_room = Room::new();
     let mut used_glyphs = vec![];
@@ -84,7 +92,7 @@ pub fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
             continue;
         }
 
-        let branch_direction_idx = rng.random_range(0..available_branches.iter().len());
+        let branch_direction_idx = rng.random_range(0..available_branches.len());
         let branch_direction = *available_branches.get(branch_direction_idx).unwrap();
         let return_direction = branch_direction.opposite();
         let branch_to_room_position = branch_from_room_position.step(branch_direction);
@@ -152,21 +160,22 @@ pub fn generate_dungeon(size: Size, room_count: usize) -> (Dungeon, Position) {
         }
     }
 
-    let min_x = map.keys().map(|x| x.x).reduce(|acc, x| if acc < x { acc } else { x }).unwrap();
+    let min_x = map.keys().map(|x| x.x).min().unwrap();
 
     start_position.x -= min_x;
 
     let mut dungeon = Dungeon::new_with_size(size);
-
     let mut rooms = HashMap::new();
 
-    for (position, room) in map {
-        let shifted_position = Position::new(position.x - min_x, position.y);
+    rooms.extend(
+        map
+            .into_iter()
+            .map(|(position, room)| {
+                (Position::new(position.x - min_x, position.y), room)
+            })
+    );
 
-        rooms.insert(shifted_position, room);
-    }
-
-    for (_, passage) in passages.iter_mut() {
+    for passage in passages.values_mut() {
         if let Passage::Room { room_1, room_2 } = passage {
             room_1.x -= min_x;
             room_2.x -= min_x;
@@ -361,4 +370,147 @@ fn partition_rooms(rooms: &mut HashMap<Position, Room>, passages: &HashMap<Strin
     }
 
     partitions
+}
+
+#[cfg(test)]
+mod test {
+    use rand::{SeedableRng, rngs::StdRng};
+
+use super::*;
+    #[test]
+    fn dungeon_generation_test() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let expected_room_count = 32;
+
+        for _ in 0..500 {
+            let (dungeon, start_position) = generate_dungeon_with_rng(
+                &mut rng,
+                Size::new(16, 16), expected_room_count
+            );
+
+            let visited_rooms = evaluate_solvability(&dungeon, start_position);
+
+            assert_eq!(dungeon.get_room_count(), visited_rooms.len());
+            assert_eq!(dungeon.get_room_count(), expected_room_count);
+        }
+    }
+
+    fn evaluate_solvability(dungeon: &Dungeon, start_position: Position) -> Vec<Position> {
+        let mut accessible_rooms = vec![];
+        let mut visited_rooms = vec![];
+        let mut locked_doors  = vec![];
+        let mut keys = vec![];
+
+        accessible_rooms.push(start_position);
+
+        while let Some(position) = accessible_rooms.pop() {
+            let room = dungeon.get_room(position).expect("Unable to find room");
+            take_keys(&mut keys, room);
+            let mut passages = get_room_passages(dungeon, room);
+
+            while let Some(passage) = passages.pop() {
+                match passage {
+                    Passage::Door { state: DoorState::Locked, .. } => check_door_and_push(&mut locked_doors, passage),
+                    Passage::Door { room_1, room_2, .. } => check_room_and_push(&mut accessible_rooms, &visited_rooms, room_1, room_2, position),
+                    Passage::Room { room_1, room_2 } => check_room_and_push(&mut accessible_rooms, &visited_rooms, room_1, room_2, position),
+                }
+            }
+
+            visited_rooms.push(position);
+
+            unlock_doors(
+                &mut accessible_rooms,
+                &visited_rooms,
+                &mut locked_doors,
+                &mut keys
+            );
+        }
+        visited_rooms
+    }
+
+    fn check_door_and_push<'a>(
+        locked_doors: &mut Vec<&'a Passage>,
+        passage     : &'a Passage
+    ) {
+        if !locked_doors.contains(&passage) {
+            locked_doors.push(passage)
+        }
+    }
+
+    fn unlock_doors<'a>(
+        accessible_rooms: &'a mut Vec<Position>,
+        visited_rooms   : &[Position],
+        locked_doors    : &'a mut Vec<&Passage>,
+        keys            : &'a mut Vec<Key>
+    ) {
+        let glyphs: Vec<Glyph> = keys
+            .iter()
+            .map(|x| x.get_glyph())
+            .collect();
+
+        let matched_pairs: Vec<(Glyph, Passage)> = locked_doors
+            .iter()
+            .filter_map(|x| if let Passage::Door { glyph, .. } = x && glyphs.contains(glyph) { Some((*glyph, **x)) } else { None })
+            .collect();
+
+        for (glyph, passage) in matched_pairs {
+            let pos = keys
+                .iter()
+                .position(|x| x.get_glyph() == glyph).expect("Where's the key?!");
+
+            keys.swap_remove(pos);
+
+            let pos = locked_doors
+                .iter()
+                .position(|x| *x == &passage).expect("Where's my passage?!");
+
+            locked_doors.swap_remove(pos);
+
+            if let Passage::Door { room_1, room_2, .. } = passage {
+                if !visited_rooms.contains(&room_1) && !accessible_rooms.contains(&room_1) {
+                    accessible_rooms.push(room_1);
+                }
+
+                if !visited_rooms.contains(&room_2) && !accessible_rooms.contains(&room_2) {
+                    accessible_rooms.push(room_2);
+                }
+            }
+        }
+    }
+
+    fn take_keys(keys: &mut Vec<Key>, room: &Room) {
+        let inventory = room.get_inventory();
+        let mut room_keys: Vec<Key> = inventory.get_items()
+            .iter()
+            .map(|x| x.as_ref())
+            .filter_map(|x| x.as_key())
+            .cloned()
+            .collect();
+
+        if !room_keys.is_empty() {
+            keys.append(&mut room_keys);
+        }
+    }
+
+    fn check_room_and_push(
+        accessible_rooms: &mut Vec<Position>,
+        visited_rooms   : &[Position],
+        room_1          : &Position,
+        room_2          : &Position,
+        position        : Position
+    ) {
+        let destination_room = if position == *room_1 { *room_2 } else { *room_1 };
+
+        if !visited_rooms.contains(&destination_room) && !accessible_rooms.contains(&destination_room){
+            accessible_rooms.push(destination_room);
+        }
+    }
+
+    fn get_room_passages<'a>(dungeon: &'a Dungeon, room: &'a Room) -> Vec<&'a Passage> {
+        room
+            .get_passages()
+            .values()
+            .map(|passage_id| dungeon.get_passage(passage_id).unwrap())
+            .collect()
+    }
 }
