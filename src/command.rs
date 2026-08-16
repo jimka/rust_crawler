@@ -1,6 +1,7 @@
 use std::{str::FromStr};
 
 use crate::dungeon::{Dungeon,Passage,DoorState};
+use crate::error::TakeDirectionError;
 use crate::inventory::{ItemType, Key};
 use crate::player::Player;
 use crate::util::{Direction,Position};
@@ -23,7 +24,7 @@ pub enum Command {
 }
 
 impl FromStr for Command {
-    type Err = String;
+    type Err = std::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         const INVALID_DIRECTION: &str = "That's not a valid direction!";
@@ -110,11 +111,6 @@ impl FromStr for Command {
             _ => Ok(Command::Unknown)
         }
     }
-}
-
-pub enum TakeDirectionError {
-    Incomplete,
-    Invalid
 }
 
 pub fn take_direction(tokens: &mut std::str::SplitWhitespace<'_>) -> Result<Direction, TakeDirectionError> {

@@ -1,4 +1,5 @@
 // ---- Module registry ----
+mod error;
 mod dungeon;
 mod util;
 mod command;
@@ -16,7 +17,7 @@ use player::Player;
 use dungeon::Dungeon;
 use util::Size;
 
-use crate::dungeon_generator::generate_dungeon;
+use crate::{dungeon_generator::generate_dungeon, error::GameError};
 
 fn main() {
     game_loop();
@@ -63,7 +64,7 @@ fn step<R, W>(
     writer : &mut W,
     dungeon: &mut Dungeon,
     player : &mut Player
-) -> Result<CommandResult, String>
+) -> Result<CommandResult, GameError>
 where
     R: BufRead,
     W: Write
@@ -87,7 +88,7 @@ where
     Ok(result)
 }
 
-fn query_input<R, W>(reader: &mut R, writer: &mut W) -> Result<String, String>
+fn query_input<R, W>(reader: &mut R, writer: &mut W) -> Result<String, GameError>
 where
     R: BufRead,
     W: Write
@@ -95,16 +96,10 @@ where
     let _ = writeln!(writer, "What do you want to do?");
     let _ = write!(writer, "> ");
 
-    let result = writer.flush();
-    if result.is_err() {
-        return Err("Unable to flush output!".to_string());
-    }
+    writer.flush()?;
 
     let mut input = String::new();
-    let result = reader.read_line(&mut input);
-    if result.is_err() {
-        return Err("Unable to read input!".to_string());
-    }
+    let _ = reader.read_line(&mut input)?;
 
     Ok(input)
 }

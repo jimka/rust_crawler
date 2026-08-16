@@ -1,17 +1,11 @@
 use std::{collections::{BTreeMap, HashMap}, fmt::Display};
 
-use crate::{glyph::Glyph, inventory::Inventory, util::{Direction,Position,Size}};
+use crate::{error::AddRoomError, glyph::Glyph, inventory::Inventory, util::{Direction,Position,Size}};
 
 pub struct Dungeon {
     pub size: Size,
     rooms: HashMap<Position, Room>,
     passages: HashMap<String, Passage>
-}
-
-#[derive(Debug, PartialEq)]
-pub enum AddRoomError {
-    OutOfBounds,
-    Occupied
 }
 
 impl Dungeon {
