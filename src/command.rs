@@ -328,7 +328,7 @@ fn list_inventory(output: &mut Vec<String>, inventory: &crate::inventory::Invent
     output.push("You see the following items:".to_string());
 
     // How do I make inventory be an iterator?
-    for item in inventory.get_items() {
+    for item in inventory {
         let description = item.get_description();
         output.push(format!("  * {description}"));
     }

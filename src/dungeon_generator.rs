@@ -480,7 +480,7 @@ use super::*;
 
     fn take_keys(keys: &mut Vec<Key>, room: &Room) {
         let inventory = room.get_inventory();
-        let mut room_keys: Vec<Key> = inventory.get_items()
+        let mut room_keys: Vec<Key> = inventory
             .iter()
             .map(|x| x.as_ref())
             .filter_map(|x| x.as_key())

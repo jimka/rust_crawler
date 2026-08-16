@@ -23,10 +23,6 @@ impl Inventory {
             .map(|x| x.as_ref())
     }
 
-    pub fn get_items(&self) -> &Vec<Box<dyn Item>> {
-        &self.items
-    }
-
     pub fn take_item(&mut self, item_id: &str) -> Option<Box<dyn Item>> {
         let opt = self.items
             .iter()
@@ -49,6 +45,19 @@ impl Inventory {
 
     pub fn put_boxed_item(&mut self, item: Box<dyn Item>) {
         self.items.push(item);
+    }
+    
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Box<dyn Item>> {
+        self.items.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Inventory {
+    type Item = &'a Box<dyn Item>;
+    type IntoIter = std::slice::Iter<'a, Box<dyn Item>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
