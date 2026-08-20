@@ -2,7 +2,7 @@ use std::{str::FromStr};
 
 use crate::dungeon::{Dungeon,Passage,DoorState};
 use crate::error::TakeDirectionError;
-use crate::inventory::{ItemType, Key};
+use crate::item::Item;
 use crate::player::Player;
 use crate::util::{Direction,Position};
 
@@ -346,7 +346,7 @@ fn take(dungeon: &mut Dungeon, player: &mut Player, item_id: &str) -> Vec<String
         return vec!("No such item exists!".to_string());
     };
 
-    to_inventory.put_boxed_item(item);
+    to_inventory.put_item(item);
 
     vec![format!("You take {item_id} and place it into your inventory.")]
 }
@@ -363,7 +363,7 @@ fn put(dungeon: &mut Dungeon, player: &mut Player, item_id: &str) -> Vec<String>
         return vec!("No such item exists!".to_string());
     };
 
-    to_inventory.put_boxed_item(item);
+    to_inventory.put_item(item);
 
     vec![format!("You take {item_id} from your inventory and put it in the room.")]
 }
@@ -450,20 +450,17 @@ fn use_item(dungeon: &mut Dungeon, player: &Player, item_id: String) -> Vec<Stri
         return vec![format!("You don't have {item_id}")];
     };
 
-    match item.get_type() {
-        ItemType::Key => use_key(dungeon, player, item.as_key().unwrap()),
+    match item {
+        Item::Key { .. } => use_key(dungeon, player, item),
     }
 }
 
-fn use_key(dungeon: &mut Dungeon, player: &Player, key: &Key) -> Vec<String> {
-    let door = key.get_door();
-    let Some(Passage::Door { state, glyph, room_1, room_2 }) = dungeon.get_passage_mut(door) else {
+fn use_key(dungeon: &mut Dungeon, player: &Player, key: &Item) -> Vec<String> {
+    let Item::Key { door, .. } = key;
+
+    let Some(Passage::Door { state, room_1, room_2, .. }) = dungeon.get_passage_mut(door) else {
         panic!("Couldn't find door!")
     };
-
-    if key.get_glyph() != *glyph {
-        panic!("Inconsistant dungeon state. Glyph on key doesn't match glyph on door.")
-    }
 
     if *room_1 != player.get_position() && *room_2 != player.get_position(){
         return vec!["The key doesn't fit any door in this room!".to_string()];
@@ -515,9 +512,7 @@ mod tests {
         ]);
 
         for (s, d) in map {
-            let Ok(d2) = s.parse::<Command>() else {
-                panic!("Unable to parse command.");
-            };
+            let Ok(d2) = s.parse::<Command>();
 
             assert_eq!(d, d2);
         }

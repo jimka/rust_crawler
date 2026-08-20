@@ -4,6 +4,7 @@ mod dungeon;
 mod util;
 mod command;
 mod player;
+mod item;
 mod inventory;
 mod dungeon_generator;
 mod glyph;

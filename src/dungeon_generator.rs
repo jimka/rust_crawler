@@ -9,7 +9,7 @@ use crate::{
         Dungeon,
         Passage,
         Room
-    }, glyph::Glyph, inventory::Key, util::{
+    }, glyph::Glyph, item::Item, util::{
         Direction,
         Position,
         Size
@@ -247,7 +247,7 @@ fn place_keys(
             let room = rooms.get_mut(room_position).expect("Where's my room?!");
 
             let room_inventory = room.get_inventory_mut();
-            room_inventory.put_item(Key::new(*glyph, &door_id));
+            room_inventory.put_item(Item::new_key(&door_id, *glyph));
         } else {
             let destination_idx = partitions_with_doors
                 .iter()
@@ -264,7 +264,7 @@ fn place_keys(
             let room = rooms.get_mut(room_position).expect("Where's my room?!");
 
             let room_inventory = room.get_inventory_mut();
-            room_inventory.put_item(Key::new(*glyph, &door_id));
+            room_inventory.put_item(Item::new_key(&door_id, *glyph));
 
             destination_door_ids.retain(|x| *x != door_id);
 
@@ -441,11 +441,11 @@ use super::*;
         accessible_rooms: &'a mut Vec<Position>,
         visited_rooms   : &[Position],
         locked_doors    : &'a mut Vec<&Passage>,
-        keys            : &'a mut Vec<Key>
+        keys            : &'a mut Vec<Item>
     ) {
         let glyphs: Vec<Glyph> = keys
             .iter()
-            .map(|x| x.get_glyph())
+            .filter_map(|x| if let Item::Key { glyph, .. } = x { Some(*glyph) } else { None })
             .collect();
 
         let matched_pairs: Vec<(Glyph, Passage)> = locked_doors
@@ -453,10 +453,11 @@ use super::*;
             .filter_map(|x| if let Passage::Door { glyph, .. } = x && glyphs.contains(glyph) { Some((*glyph, **x)) } else { None })
             .collect();
 
-        for (glyph, passage) in matched_pairs {
+        for (g, passage) in matched_pairs {
             let pos = keys
                 .iter()
-                .position(|x| x.get_glyph() == glyph).expect("Where's the key?!");
+                .position(|x| if let Item::Key { glyph, .. } = x { *glyph == g } else { false })
+                .expect("Where's the key?!");
 
             keys.swap_remove(pos);
 
@@ -478,12 +479,13 @@ use super::*;
         }
     }
 
-    fn take_keys(keys: &mut Vec<Key>, room: &Room) {
+    fn take_keys(keys: &mut Vec<Item>, room: &Room) {
         let inventory = room.get_inventory();
-        let mut room_keys: Vec<Key> = inventory
+        let mut room_keys: Vec<Item> = inventory
             .iter()
-            .map(|x| x.as_ref())
-            .filter_map(|x| x.as_key())
+            .filter_map(|x| {
+                if let Item::Key { .. } = x { Some(x) } else { None }
+            })
             .cloned()
             .collect();
 
